@@ -7,61 +7,67 @@ import optparse
 import cairo
 from gi.repository import GObject, Gtk, Gdk, WebKit, Soup
 
-def capture(url, filename, options):
-    window = Gtk.OffscreenWindow.new()
-    webview = WebKit.WebView.new()
-    webview.load_uri(url)
 
-    webview.set_zoom_level(options.zoom)
+class WebGrabber(object):
+    def __init__(self, url, filename, options):
+        self.url = url
+        self.filename = filename
+        self.options = options
 
-    # In scroll mode, we wrap the window in a scrolled window to "look"
-    # like a browser.
-    if options.scroll:
-        sw = Gtk.ScrolledWindow.new(None, None)
-        sw.set_size_request(options.width, options.height)
-        sw.add(webview)
-        window.add(sw)
-    else:
-        webview.set_size_request(options.width, options.height)
-        window.add(webview)
+    def capture(self):
+        window = Gtk.OffscreenWindow.new()
+        webview = WebKit.WebView.new()
+        webview.load_uri(self.url)
 
-    window.show_all()
+        webview.set_zoom_level(self.options.zoom)
 
-    def save_capture(window):
+        # In scroll mode, we wrap the window in a scrolled window to "look"
+        # like a browser.
+        if self.options.scroll:
+            sw = Gtk.ScrolledWindow.new(None, None)
+            sw.set_size_request(self.options.width, self.options.height)
+            sw.add(webview)
+            window.add(sw)
+        else:
+            webview.set_size_request(self.options.width, self.options.height)
+            window.add(webview)
+
+        webview.connect_after('notify::load-status', self.on_load_status_changed, window)
+        print "Waiting for page to load before capturing"
+
+        window.show_all()
+        Gtk.main()
+        sys.exit(1)
+
+    def save_capture(self, window):
         allocation = window.get_allocation()
 
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, allocation.width, allocation.height)
         cr = cairo.Context(surface)
         window.draw(cr)
 
-        if options.crop:
-            print "Cropping: origin (%d, %d), size %dx%d" % (options.crop_x, options.crop_y, options.crop_w, options.crop_h)
-            cropped_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, options.crop_w, options.crop_h)
+        if self.options.crop:
+            cropped_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, self.options.crop_w, self.options.crop_h)
             cr = cairo.Context(cropped_surface)
-            cr.set_source_surface(surface, -options.crop_x, -options.crop_y)
+            cr.set_source_surface(surface, -self.options.crop_x, -self.options.crop_y)
             cr.paint()
             surface = cropped_surface
 
-        surface.write_to_png(filename)
+        surface.write_to_png(self.filename)
         sys.exit(0)
         return False
 
-    def on_load_status_changed(webview, pspec, window):
+    def on_load_status_changed(self, webview, pspec, window):
         if webview.props.load_status == WebKit.LoadStatus.FINISHED:
             # We must wait for the layout to be finalized before scrolling.
-            if options.scroll:
-                sw.get_hadjustment().set_value(options.scroll_x)
-                sw.get_vadjustment().set_value(options.scroll_y)
+            if self.options.scroll:
+                sw.get_hadjustment().set_value(self.options.scroll_x)
+                sw.get_vadjustment().set_value(self.options.scroll_y)
 
             # We put the capture saving in an idle because when the notify is
             # received, the rendering might not be finished.
-            GObject.idle_add(save_capture, window)
+            GObject.idle_add(self.save_capture, window)
 
-    webview.connect_after('notify::load-status', on_load_status_changed, window)
-    print "Waiting for page to load before capturing"
-
-    Gtk.main()
-    sys.exit(1)
 
 def main():
     usage = "%prog [options] <url> <filename>"
@@ -98,7 +104,7 @@ def main():
         session = WebKit.get_default_session()
         session.add_feature(Soup.CookieJarText.new(opeions.cookies, True))
 
-    capture(args[0], args[1], options)
+    WebGrabber(args[0], args[1], options).capture()
 
 if __name__ == '__main__':
     main()
