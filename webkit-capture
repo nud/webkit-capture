@@ -5,7 +5,7 @@ import sys
 import optparse
 
 import cairo
-from gi.repository import GObject, Gtk, Gdk, WebKit
+from gi.repository import GObject, Gtk, Gdk, WebKit, Soup
 
 def capture(url, filename, options):
     window = Gtk.OffscreenWindow.new()
@@ -61,6 +61,8 @@ def main():
                       help="zoom level of browser (default: 1.0)")
     parser.add_option("-c", "--clip", action="store_true",
                       help="clip to the specified size")
+    parser.add_option("--cookies", type="string",
+                      help="read cookies from a Mozilla cookie file")
 
     (options, args) = parser.parse_args()
 
@@ -70,6 +72,10 @@ def main():
 
     if options.zoom <= 0.0:
         parser.error("scale cannot be zero")
+
+    if options.cookies:
+        session = WebKit.get_default_session()
+        session.add_feature(Soup.CookieJarText.new(opeions.cookies, True))
 
     capture(args[0], args[1], options)
 
