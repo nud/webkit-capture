@@ -12,10 +12,19 @@ def capture(url, filename, options):
     webview = WebKit.WebView.new()
     webview.load_uri(url)
 
-    webview.set_size_request(options.width, options.height)
     webview.set_zoom_level(options.zoom)
 
-    window.add(webview)
+    # In scroll mode, we wrap the window in a scrolled window to "look"
+    # like a browser.
+    if options.scroll:
+        sw = Gtk.ScrolledWindow.new(None, None)
+        sw.set_size_request(options.width, options.height)
+        sw.add(webview)
+        window.add(sw)
+    else:
+        webview.set_size_request(options.width, options.height)
+        window.add(webview)
+
     window.show_all()
 
     def save_capture(window):
@@ -39,6 +48,11 @@ def capture(url, filename, options):
 
     def on_load_status_changed(webview, pspec, window):
         if webview.props.load_status == WebKit.LoadStatus.FINISHED:
+            # We must wait for the layout to be finalized before scrolling.
+            if options.scroll:
+                sw.get_hadjustment().set_value(options.scroll_x)
+                sw.get_vadjustment().set_value(options.scroll_y)
+
             # We put the capture saving in an idle because when the notify is
             # received, the rendering might not be finished.
             GObject.idle_add(save_capture, window)
@@ -53,10 +67,10 @@ def main():
     usage = "%prog [options] <url> <filename>"
 
     parser = optparse.OptionParser(usage)
-    parser.add_option("-W", "--width", type="int", default=800,
-                      help="minimum width of browser (default: 800)")
-    parser.add_option("-H", "--height", type="int", default=600,
-                      help="minimum height of browser (default: 600)")
+    parser.add_option("-g", "--geometry", type="str", default="800x600",
+                      help="minimum geometry of the browser (default: 800x600)")
+    parser.add_option("-s", "--scroll", type="str", default=None,
+                      help="scroll to coordinates (default: not set)")
     parser.add_option("-z", "--zoom", type="float", default=1.0,
                       help="zoom level of browser (default: 1.0)")
     parser.add_option("-c", "--clip", action="store_true",
@@ -69,6 +83,10 @@ def main():
     if len(args) == 0:
         parser.print_usage()
         return
+
+    options.width, options.height = map(int, options.geometry.split('x'))
+    if options.scroll:
+        options.scroll_x, options.scroll_y = map(int, options.scroll.split(','))
 
     if options.zoom <= 0.0:
         parser.error("scale cannot be zero")
