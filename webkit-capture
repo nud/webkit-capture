@@ -28,19 +28,11 @@ def capture(url, filename, options):
     window.show_all()
 
     def save_capture(window):
-        pixbuf = window.get_pixbuf()
+        allocation = window.get_allocation()
 
-        if options.clip:
-            width = options.width
-            height = options.height
-        else:
-            width = pixbuf.get_width();
-            height = pixbuf.get_height()
-
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, allocation.width, allocation.height)
         cr = cairo.Context(surface)
-        Gdk.cairo_set_source_pixbuf(cr, pixbuf, 0, 0)
-        cr.paint()
+        window.draw(cr)
 
         surface.write_to_png(filename)
         sys.exit(0)
@@ -73,8 +65,6 @@ def main():
                       help="scroll to coordinates (default: not set)")
     parser.add_option("-z", "--zoom", type="float", default=1.0,
                       help="zoom level of browser (default: 1.0)")
-    parser.add_option("-c", "--clip", action="store_true",
-                      help="clip to the specified size")
     parser.add_option("--cookies", type="string",
                       help="read cookies from a Mozilla cookie file")
 
