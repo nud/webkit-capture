@@ -34,6 +34,14 @@ def capture(url, filename, options):
         cr = cairo.Context(surface)
         window.draw(cr)
 
+        if options.crop:
+            print "Cropping: origin (%d, %d), size %dx%d" % (options.crop_x, options.crop_y, options.crop_w, options.crop_h)
+            cropped_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, options.crop_w, options.crop_h)
+            cr = cairo.Context(cropped_surface)
+            cr.set_source_surface(surface, -options.crop_x, -options.crop_y)
+            cr.paint()
+            surface = cropped_surface
+
         surface.write_to_png(filename)
         sys.exit(0)
         return False
@@ -65,6 +73,8 @@ def main():
                       help="scroll to coordinates (default: not set)")
     parser.add_option("-z", "--zoom", type="float", default=1.0,
                       help="zoom level of browser (default: 1.0)")
+    parser.add_option("-c", "--crop", type="str", default=None,
+                      help="crop the picture to the given area (default: not set)")
     parser.add_option("--cookies", type="string",
                       help="read cookies from a Mozilla cookie file")
 
@@ -80,6 +90,9 @@ def main():
 
     if options.zoom <= 0.0:
         parser.error("scale cannot be zero")
+
+    if options.crop:
+        options.crop_w, options.crop_h, options.crop_x, options.crop_y = map(int, options.crop.replace('x', '+').split('+'))
 
     if options.cookies:
         session = WebKit.get_default_session()
