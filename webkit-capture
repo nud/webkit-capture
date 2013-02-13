@@ -3,6 +3,7 @@
 
 import sys
 import optparse
+import time
 
 import cairo
 from gi.repository import GObject, Gtk, Gdk, WebKit, Soup
@@ -63,6 +64,31 @@ class WebGrabber(object):
         sys.exit(0)
         return False
 
+    def find_device(self, display):
+        for device in display.get_device_manager().list_devices(Gdk.DeviceType.MASTER):
+            if device.get_source() == Gdk.InputSource.MOUSE:
+                return device
+        print "No mouse device found"
+
+    def make_motion_event(self, webview, x, y):
+        window = webview.get_window()
+        display = window.get_display()
+        origin = window.get_origin()[1:] # discard the int return value.
+
+        e = Gdk.Event.new(Gdk.EventType.MOTION_NOTIFY)
+        e.any.window = window
+        e.any.send_event = False
+        e.motion.time = time.time()
+        e.motion.state = 0
+        e.motion.x = x
+        e.motion.x_root = origin[0] + x
+        e.motion.y = y
+        e.motion.y_root = origin[1] + y
+        e.motion.is_hint = False
+        e.motion.device = self.find_device(display)
+
+        display.put_event(e)
+
     def on_load_status_changed(self, webview, pspec, window):
         if webview.props.load_status == WebKit.LoadStatus.FINISHED:
             # We must wait for the layout to be finalized before scrolling.
@@ -70,9 +96,13 @@ class WebGrabber(object):
                 sw.get_hadjustment().set_value(self.options.scroll_x)
                 sw.get_vadjustment().set_value(self.options.scroll_y)
 
+            # Simulate the mouse hovering the web page.
+            if self.options.point:
+                self.make_motion_event(webview, self.options.point_x, self.options.point_y)
+
             # We put the capture saving in an idle because when the notify is
             # received, the rendering might not be finished.
-            GObject.idle_add(self.save_capture, window)
+            GObject.timeout_add_seconds(1, self.save_capture, window)
 
 
 def main():
