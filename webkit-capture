@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+# vim:set ts=4 sw=4 et:
+
+import sys
+import optparse
+
+import cairo
+from gi.repository import GObject, Gtk, Gdk, WebKit
+
+def capture(url, filename, options):
+    window = Gtk.OffscreenWindow.new()
+    webview = WebKit.WebView.new()
+    webview.load_uri(url)
+
+    webview.set_size_request(options.width, options.height)
+    webview.set_zoom_level(options.zoom)
+
+    window.add(webview)
+    window.show_all()
+
+    def save_capture(window):
+        pixbuf = window.get_pixbuf()
+
+        if options.clip:
+            width = options.width
+            height = options.height
+        else:
+            width = pixbuf.get_width();
+            height = pixbuf.get_height()
+
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
+        cr = cairo.Context(surface)
+        Gdk.cairo_set_source_pixbuf(cr, pixbuf, 0, 0)
+        cr.paint()
+
+        surface.write_to_png(filename)
+        sys.exit(0)
+        return False
+
+    def on_load_status_changed(webview, pspec, window):
+        if webview.props.load_status == WebKit.LoadStatus.FINISHED:
+            # We put the capture saving in an idle because when the notify is
+            # received, the rendering might not be finished.
+            GObject.idle_add(save_capture, window)
+
+    webview.connect_after('notify::load-status', on_load_status_changed, window)
+    print "Waiting for page to load before capturing"
+
+    Gtk.main()
+    sys.exit(1)
+
+def main():
+    usage = "%prog [options] <url> <filename>"
+
+    parser = optparse.OptionParser(usage)
+    parser.add_option("-W", "--width", type="int", default=800,
+                      help="minimum width of browser (default: 800)")
+    parser.add_option("-H", "--height", type="int", default=600,
+                      help="minimum height of browser (default: 600)")
+    parser.add_option("-z", "--zoom", type="float", default=1.0,
+                      help="zoom level of browser (default: 1.0)")
+    parser.add_option("-c", "--clip", action="store_true",
+                      help="clip to the specified size")
+
+    (options, args) = parser.parse_args()
+
+    if len(args) == 0:
+        parser.print_usage()
+        return
+
+    if options.zoom <= 0.0:
+        parser.error("scale cannot be zero")
+
+    capture(args[0], args[1], options)
+
+if __name__ == '__main__':
+    main()

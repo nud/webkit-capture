@@ -1,0 +1,6 @@
+webkit-capture is yet another Linux-based command line tool to create PNG
+screenshots of web pages.
+
+It's written in python 3 so it's easier to hack and adapt than the various
+C(++) implementations out there and it's based on pygobject 3 and webkitgtk
+so it works on Linux and not just on Apple OSes.
