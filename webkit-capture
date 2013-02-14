@@ -32,8 +32,9 @@ class WebGrabber(object):
         else:
             webview.set_size_request(self.options.width, self.options.height)
             window.add(webview)
+            sw = None
 
-        webview.connect_after('notify::load-status', self.on_load_status_changed, window)
+        webview.connect_after('notify::load-status', self.on_load_status_changed, window, sw)
         print "Waiting for page to load before capturing"
 
         window.show_all()
@@ -89,7 +90,7 @@ class WebGrabber(object):
 
         display.put_event(e)
 
-    def on_load_status_changed(self, webview, pspec, window):
+    def on_load_status_changed(self, webview, pspec, window, sw):
         if webview.props.load_status == WebKit.LoadStatus.FINISHED:
             # We must wait for the layout to be finalized before scrolling.
             if self.options.scroll:
@@ -140,7 +141,7 @@ def main():
 
     if options.cookies:
         session = WebKit.get_default_session()
-        session.add_feature(Soup.CookieJarText.new(opeions.cookies, True))
+        session.add_feature(Soup.CookieJarText.new(options.cookies, True))
 
     if options.point:
         options.point_x, options.point_y = map(int, options.point.split(','))
