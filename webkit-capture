@@ -97,6 +97,10 @@ class WebGrabber(object):
                 sw.get_hadjustment().set_value(self.options.scroll_x)
                 sw.get_vadjustment().set_value(self.options.scroll_y)
 
+            # Handle the --execute option.
+            if self.options.script:
+                webview.execute_script(self.options.script)
+
             # Simulate the mouse hovering the web page.
             if self.options.point:
                 self.make_motion_event(webview, self.options.point_x, self.options.point_y)
@@ -122,6 +126,8 @@ def main():
                       help="read cookies from a Mozilla cookie file")
     parser.add_option("-p", "--point", type="string",
                       help="display pointer at the given coordinates (default: not set)")
+    parser.add_option("-x", "--execute", dest="script", type="string", metavar="SCRIPT",
+                      help="execute a script when the page is loaded")
 
     (options, args) = parser.parse_args()
 
