@@ -4,6 +4,7 @@
 import os
 import sys
 import optparse
+import re
 import time
 
 import cairo
@@ -69,6 +70,28 @@ class WebGrabber(object):
         sys.exit(0)
         return False
 
+    def parse_point_spec(self, webview):
+        matches = re.match('^(\d+),(\d+)$', self.options.point)
+        if matches:
+            self.options.point_x = int(matches.group(1))
+            self.options.point_y = int(matches.group(2))
+            return True
+
+        if self.options.point.startswith('#'):
+            elem = webview.get_dom_document().get_element_by_id(self.options.point[1:])
+            if elem:
+                self.options.point_x = elem.get_offset_left() + elem.get_offset_width() / 2
+                self.options.point_y = elem.get_offset_top() + elem.get_offset_height() / 2
+                return True
+            else:
+                print "Element '%s' not found in the web page." % self.options.point
+                self.options.point = None
+                return False
+
+        print "Unrecognized format for point spec: '%s'" % self.options.point
+        self.options.point = None
+        return False
+
     def find_device(self, display):
         for device in display.get_device_manager().list_devices(Gdk.DeviceType.MASTER):
             if device.get_source() == Gdk.InputSource.MOUSE:
@@ -106,7 +129,7 @@ class WebGrabber(object):
                 webview.execute_script(self.options.script)
 
             # Simulate the mouse hovering the web page.
-            if self.options.point:
+            if self.options.point and self.parse_point_spec(webview):
                 self.make_motion_event(webview, self.options.point_x, self.options.point_y)
 
             # We put the capture saving in an idle because when the notify is
@@ -152,9 +175,6 @@ def main():
     if options.cookies:
         session = WebKit.get_default_session()
         session.add_feature(Soup.CookieJarText.new(options.cookies, True))
-
-    if options.point:
-        options.point_x, options.point_y = map(int, options.point.split(','))
 
     WebGrabber(args[0], args[1], options).capture()
 
