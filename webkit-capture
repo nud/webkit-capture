@@ -60,10 +60,11 @@ class WebGrabber(object):
             surface = cropped_surface
 
         if self.options.point:
-            cursor_filename = os.path.join(CURSOR_DIR, 'left_ptr.png')
+            cursor_filename = os.path.join(CURSOR_DIR, self.options.point_cursor + '.png')
             cursor_surface = cairo.ImageSurface.create_from_png(cursor_filename)
             cr = cairo.Context(surface)
-            cr.set_source_surface(cursor_surface, self.options.point_x-6, self.options.point_y-2)
+            hoffset = self.options.point_cursor == 'left_ptr' and 6 or 8
+            cr.set_source_surface(cursor_surface, self.options.point_x-hoffset, self.options.point_y-3)
             cr.paint()
 
         surface.write_to_png(self.filename)
@@ -91,6 +92,27 @@ class WebGrabber(object):
         print "Unrecognized format for point spec: '%s'" % self.options.point
         self.options.point = None
         return False
+
+    def choose_cursor(self, webview, x, y):
+        # Let's borrow the cursor to use in the element style.
+        document = webview.get_dom_document()
+        elem = document.element_from_point(x, y)
+        cursor = document.get_default_view().get_computed_style(elem, ':hover').get_property_value('cursor')
+
+        # When the cursor property is set to auto, it means choosing the cursor
+        # is up to the user agent. Let's do what everyone expects, and display
+        # a pointer if we're somewhere on a <a> tag.
+        if cursor == 'auto':
+            cursor = 'default'
+            while elem != document:
+                if elem.get_tag_name() == 'A':
+                    cursor = 'pointer'
+                    break
+                elem = elem.get_parent_node()
+
+        # We support two cursors: the regular arrow, and the pointing hand for links.
+        self.options.point_cursor = cursor == 'pointer' and 'hand1' or 'left_ptr'
+
 
     def find_device(self, display):
         for device in display.get_device_manager().list_devices(Gdk.DeviceType.MASTER):
@@ -130,6 +152,7 @@ class WebGrabber(object):
 
             # Simulate the mouse hovering the web page.
             if self.options.point and self.parse_point_spec(webview):
+                self.choose_cursor(webview, self.options.point_x, self.options.point_y)
                 self.make_motion_event(webview, self.options.point_x, self.options.point_y)
 
             # We put the capture saving in an idle because when the notify is
